@@ -15,6 +15,10 @@ class Channels(commands.Cog, name='channels'):
 
 	@channel.command()
 	async def new(self, ctx, name: str):			# TODO log inside reason
+		"""Creates a new temporary channel.
+
+		The channel gets deleted if it is inactive for 30secs or more.
+		"""
 		if self.category is None:
 			for c in ctx.guild.categories:
 				if c.name == 'temp':
