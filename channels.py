@@ -27,13 +27,13 @@ class Channels(commands.Cog, name='channels'):
 		if self.channels.get(ctx.author.id, None) is not None:
 			return await ctx.send("Each user can only create one channel at a time.")
 		channel = await ctx.guild.create_voice_channel(name, category=self.category, position=0)
-		await ctx.send(f'Channel was created. Join within {settings.timeout} secs or the channel will be deleted due to inactivity')
+		await ctx.send(f'Channel was created. Join within {settings.channels.timeout} secs or the channel will be deleted due to inactivity')
 
 		def check(member, before, after):
 			return member == ctx.author
 
 		try:
-			await self.bot.wait_for('voice_state_update', check=check, timeout=settings.timeout)
+			await self.bot.wait_for('voice_state_update', check=check, timeout=settings.channels.timeout)
 		except asyncio.TimeoutError:
 			return await channel.delete()
 		self.channels[ctx.author.id] = channel
@@ -51,7 +51,7 @@ class Channels(commands.Cog, name='channels'):
 			def check(m, before, after):
 				return member == m
 			try:
-				await self.bot.wait_for('voice_state_update', check=check, timeout=settings.timeout)
+				await self.bot.wait_for('voice_state_update', check=check, timeout=settings.channels.timeout)
 			except asyncio.TimeoutError:
 				self.channels.pop(k)
 				return await before.channel.delete()
