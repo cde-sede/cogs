@@ -407,7 +407,6 @@ class Engine:
 		dir_ = -1
 		if piece > 8:
 			piece -= 1 << 3; dir_ = 1
-#		assert not (self.ischeck and Pieces(piece) != Pieces.KING), 'king is check'
 
 		if Pieces(piece) == Pieces.PAWN:
 			for i in pawn_(self, pos):
@@ -795,14 +794,7 @@ class Chess(commands.Cog, name='chess'):
 	async def chess(self, ctx):
 		if not ctx.invoked_subcommand:
 			pass
-#			view = discord.ui.View()
-#			view.add_item(Dropdown())
-#			await ctx.send(f"**dropdown**", view=view)
-#			f = self.bot.get_cog('help').formatter
-#			content = '\n'.join(await f.formatcog(self, ctx=ctx))
-#			e = discord.Embed(title='Help').add_field(name='', value=content, inline=False)
-#			await ctx.send(embed=e)
-	
+
 	@chess.command()
 	async def match(self, ctx, fen: Optional[str]=None):
 		print(fen)
