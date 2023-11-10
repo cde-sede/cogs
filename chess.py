@@ -761,7 +761,23 @@ class _userselect(discord.ui.UserSelect):
 	
 	async def callback(self, interaction: discord.Interaction):
 		if interaction.user == self.chess_user:
-			self.future.set_result(self.values[0])	
+			self.future.set_result(self.values[0])
+
+class _promoteselect(discord.ui.Select):
+	def __init__(self):
+		options = [
+				discord.SelectOption(label='bishop', description='bishop', value=1),
+				discord.SelectOption(label='knight', description='knight', value=2),
+				discord.SelectOption(label='rook',   description='rook',   value=3),
+				discord.SelectOption(label='queen',  description='queen',  value=4),
+			]
+		super().__init__(placeholder='Choose what to promote to', min_values=1, max_values=1, options=options)
+
+class _promote(discord.ui.Modal):
+	promote = _promoteselect()
+
+	async def on_submit(self, interaction: discord.Interaction):
+		await interaction.response.send_message(f"{promote}", ephemeral=True)
 
 class Chess(commands.Cog, name='chess'):
 	def __init__(self, bot):
@@ -813,6 +829,12 @@ class Chess(commands.Cog, name='chess'):
 		await th.send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 
 		self.games[th.id] = {'th': th, 'game': game}
+	
+	@chess.command()
+	async def promote(self, ctx):
+		view = discord.ui.View()
+		view.add_item(_promote)	
+		await ctx.send(view=view)
 
 	@commands.Cog.listener()
 	async def on_message(self, message):
