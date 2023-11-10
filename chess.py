@@ -204,11 +204,11 @@ def king_(self, pos):
 			else:
 				yield (6, 0)
 		if self.Qcastle:
-			for p in ((3, 0), (2, 0), (1, 0)):
+			for p in ((3, 0), (2, 0) ):
 				if self.board[p[::-1]]: break
 				if self._protomove(pos, p).ischeck: break
 			else:
-				yield (1, 0)
+				yield (2, 0)
 	if self.turn == 'b':
 		if self.Kcastle:
 			for p in ((5, 7), (6, 7)):
@@ -217,11 +217,11 @@ def king_(self, pos):
 			else:
 				yield (6, 7)
 		if self.Qcastle:
-			for p in ((3, 7), (2, 7), (1, 7)):
+			for p in ((3, 7), (2, 7)):
 				if self.board[p[::-1]]: break
 				if self._protomove(pos, p).ischeck: break
 			else:
-				yield (1, 7)
+				yield (2, 7)
 
 def queen_(self, pos):
 	for i in rook_(self, pos):
@@ -355,13 +355,13 @@ class Engine:
 
 		if final:
 			if self.turn == 'w' and self.board[src[::-1]] == Pieces.KING.value + (1 << 3) and self.Kcastle and dst[0] == 6 and src[1] == dst[1] == 0:
-				new.board[0, 5], new.board[0, 7] = Pieces.ROOK.value + (1 << 3), 0 
-			if self.turn == 'w' and self.board[src[::-1]] == Pieces.KING.value + (1 << 3) and self.Qcastle and dst[0] == 1 and src[1] == dst[1] == 0:
-				new.board[0, 2], new.board[0, 0] = Pieces.ROOK.value + (1 << 3), 0 
-			if self.turn == 'b' and self.board[src[::-1]] == Pieces.KING.value          and self.kcastle and dst[0] == 6 and src[1] == dst[1] == 7:
-				new.board[7, 5], new.board[7, 7] = Pieces.ROOK.value, 0 
-			if self.turn == 'b' and self.board[src[::-1]] == Pieces.KING.value          and self.qcastle and dst[0] == 1 and src[1] == dst[1] == 7:
-				new.board[7, 2], new.board[7, 0] = Pieces.ROOK.value, 0 
+				new.board[0, 5], new.board[0, 7] = Pieces.ROOK.value + (1 << 3), 0
+			if self.turn == 'w' and self.board[src[::-1]] == Pieces.KING.value + (1 << 3) and self.Qcastle and dst[0] == 2 and src[1] == dst[1] == 0:
+				new.board[0, 3], new.board[0, 0] = Pieces.ROOK.value + (1 << 3), 0
+			if self.turn == 'b' and self.board[src[::-1]] == Pieces.KING.value            and self.kcastle and dst[0] == 6 and src[1] == dst[1] == 7:
+				new.board[7, 5], new.board[7, 7] = Pieces.ROOK.value, 0
+			if self.turn == 'b' and self.board[src[::-1]] == Pieces.KING.value            and self.qcastle and dst[0] == 2 and src[1] == dst[1] == 7:
+				new.board[7, 3], new.board[7, 0] = Pieces.ROOK.value, 0
 
 		return new
 
@@ -407,7 +407,6 @@ class Engine:
 		dir_ = -1
 		if piece > 8:
 			piece -= 1 << 3; dir_ = 1
-#		assert not (self.ischeck and Pieces(piece) != Pieces.KING), 'king is check'
 
 		if Pieces(piece) == Pieces.PAWN:
 			for i in pawn_(self, pos):
@@ -552,8 +551,6 @@ def knight_arrow(img, start, end, thickness):
 			*cv2args[:-1]
 		)
 		start[1] = end[1]
-	#triangle
-
 	triangle_len = trlen(thickness * 1.5, 3)
 
 	dir_ = end.astype(int) - start.astype(int)
@@ -594,8 +591,6 @@ def rectangle(img, pos, cell_size, color):
 	return temp
 
 def arrow(img, start, end, thickness, cell_size):
-	# draw lines
-	# draw triangle
 	c = cell_size // 2
 	startpos = np.array(start, dtype='u8')
 	endpos = np.array(end, dtype='u8')
@@ -795,18 +790,10 @@ class Chess(commands.Cog, name='chess'):
 	async def chess(self, ctx):
 		if not ctx.invoked_subcommand:
 			pass
-#			view = discord.ui.View()
-#			view.add_item(Dropdown())
-#			await ctx.send(f"**dropdown**", view=view)
-#			f = self.bot.get_cog('help').formatter
-#			content = '\n'.join(await f.formatcog(self, ctx=ctx))
-#			e = discord.Embed(title='Help').add_field(name='', value=content, inline=False)
-#			await ctx.send(embed=e)
-	
+
 	@chess.command()
 	async def match(self, ctx, fen: Optional[str]=None):
-		print(fen)
-		# create thread
+		print("new game", fen if fen else '')
 		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=False)
 		view = discord.ui.View()	
 		select = _userselect(ctx.author)
@@ -826,12 +813,6 @@ class Chess(commands.Cog, name='chess'):
 		await th.send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 
 		self.games[th.id] = {'th': th, 'game': game}
-		# send board
-
-		# only author and first responder can msg?
-		# each move gets interpreted as a chess move
-		# if a move isn't complete
-		# it gets interpreted as a move query
 
 	@commands.Cog.listener()
 	async def on_message(self, message):
