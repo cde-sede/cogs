@@ -336,7 +336,7 @@ class Engine:
 			return True
 		return False
 
-	def _protomove(self, src, dst, final=False):
+	def _protomove(self, src, dst, final=False, promote: Optional[Pieces]=None):
 		"""DO NOT USE
 
 		RESERVED FOR IMPLEMENTATION PURPOSES, COULD BE DANGEROUS"""
@@ -362,15 +362,25 @@ class Engine:
 				new.board[7, 5], new.board[7, 7] = Pieces.ROOK.value, 0
 			if self.turn == 'b' and self.board[src[::-1]] == Pieces.KING.value            and self.qcastle and dst[0] == 2 and src[1] == dst[1] == 7:
 				new.board[7, 3], new.board[7, 0] = Pieces.ROOK.value, 0
+			if promote:
+				if self.turn == 'w' and self.board[src[::-1]] == Pieces.PAWN.value + (1 << 3) and dst[1] == 7:
+					new.board[dst[::-1]] = promote.value + (1 << 3) 
+				if self.turn == 'b' and self.board[src[::-1]] == Pieces.PAWN.value            and dst[1] == 0:
+					new.board[dst[::-1]] = promote.value + (1 << 3) 
+			# TODO en passant final 
+			if self.en_passant != '-':
+				en_passant = self.fromalpha(self.en_passant)
+				if src[1] == en_passant[1] and np.abs(en_passant[0] - src[0]) == 1:
+					new.board[en_passant[::-1]] = 0	
 
 		return new
 
-	def move(self, src: str | tuple | list, dst: str | tuple | list) -> 'Engine':
+	def move(self, src: str | tuple | list, dst: str | tuple | list, promote: Optional[Pieces]=None) -> 'Engine':
 		if isinstance(src, str): src = self.fromalpha(src) 
 		if isinstance(dst, str): dst = self.fromalpha(dst) 
 
 		assert dst in self.moves(src), 'invalid move'
-		new = self._protomove(src, dst, final=True)
+		new = self._protomove(src, dst, final=True, promote=promote)
 		new.turn = 'wb'[self.turn == 'w']
 		new.en_passant = '-'
 
@@ -459,7 +469,7 @@ class Engine:
 		castling = (('K' in fields[2]) << 3) + (('Q' in fields[2]) << 2) + (('k' in fields[2]) << 1) + (('q' in fields[2]) << 0)
 
 		en_passant = fields[3]
-		assert en_passant == '-' or (en_passant[0] in 'abcdefgh' and en_passant[1] in '1234678'), 'invalid fen en passant'
+		assert en_passant == '-' or (en_passant[0] in 'abcdefgh' and en_passant[1] in '12345678'), 'invalid fen en passant'
 
 		half = fields[4]
 		assert half.isnumeric(), 'invalid fen half move clock'
@@ -551,31 +561,51 @@ def knight_arrow(img, start, end, thickness):
 			*cv2args[:-1]
 		)
 		start[1] = end[1]
-	triangle_len = trlen(thickness * 1.5, 3)
 
 	dir_ = end.astype(int) - start.astype(int)
+	triangle_len = triangle(img, end, dir_, thickness, angle=90)
+
 	end = (end - triangle_len * (dir_ / np.sqrt(np.sum(np.power(dir_,2))))).astype('u8')
 	cv2.line(img, start, end, *cv2args)
 
-	triangle(img, end, dir_, thickness, 3)
 
 
 def trlen(t, s):
 	return np.sqrt(s * t ** 2 - t ** 2)
 
-def triangle(img, pos, dir_, thickness, squish):
+def cot(a, *, unit='deg'):
+	if unit == 'deg':
+		return 1 / np.tan(a * np.pi / 180)
+	if unit == 'rad':
+		return 1 / np.tan(a)
+	raise ValueError(f'invalid unit {unit}')
+
+def getsquish(t, a, unit='deg'):
+	if unit == 'deg':
+		a = a * np.pi / 180
+	elif unit != 'rad':
+		raise ValueError(f'invalid unit {unit}')
+	return (np.tan(a) ** 2 + 1) * (cot(a, unit='rad') ** 2)
+
+def triangle(img, pos, dir_, thickness, *, squish=None, angle=None, unit='deg'):
 	"""squish: 1 = line, 2 = right angle"""
+	assert (squish is not None or angle is not None) and not (squish is not None and angle is not None), 'Only one of squish and angle can be specified'
 	t = thickness * 1.5
 	dir_ = dir_ / np.sqrt(np.sum(np.power(dir_,2))) 
 	d = rot90(dir_)
-	a = np.array(pos + d * t, dtype=int)
-	b = np.array(pos - d * t, dtype=int)
 
-	c = pos + dir_ * trlen(t, squish)
+	if angle:
+		squish = getsquish(t, angle / 2, unit=unit)
+	pc = trlen(t, squish)
+
+	a = np.array(pos + d * t, dtype=int) - pc * dir_
+	b = np.array(pos - d * t, dtype=int) - pc * dir_
+	c = pos + dir_ * pc                  - pc * dir_
 
 	pts = np.array([a, b, c], dtype=np.int32).reshape((-1, 1, 2))
 
 	cv2.fillPoly(img, [pts], color=(127, 127, 127))
+	return pc
 
 def rectangle(img, pos, cell_size, color):
 	mask = np.zeros(np.array(img).shape, dtype=np.uint8)
@@ -601,16 +631,15 @@ def arrow(img, start, end, thickness, cell_size):
 	mask = np.zeros(np.array(img).shape, dtype=np.uint8)
 	cv2args = [(127, 127, 127), thickness, 16, 0]
 
-	if np.all(startpos - endpos != 0) and np.sum(np.abs(startpos - endpos)) == 3:
+	if np.all(startpos.astype(int) - endpos.astype(int) != 0) and np.sum(np.abs(startpos.astype(int) - endpos.astype(int))) == 3:
 		knight_arrow(mask, start, end, thickness)
 	else:
-		triangle_len = trlen(thickness * 1.5, 3)
-
 		dir_ = end.astype(int) - start.astype(int)
+		triangle_len = triangle(mask, end, dir_, thickness, angle=90)
+
 		end = (end - triangle_len * (dir_ / np.sqrt(np.sum(np.power(dir_,2))))).astype('u8')
 
 		cv2.line(mask, start, end, *cv2args)
-		triangle(mask, end, dir_, thickness, 3)
 
 	mask[mask[::, ::, 1] == 127] = (127, 127, 127, 180)
 
@@ -695,26 +724,6 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 	tk = game.turn_king
 	tk = [tk[0], 7 - tk[1]]
 
-	if selected:
-		if isinstance(selected, str): src = game.fromalpha(selected) 
-		src = [src[0], 7-src[1]]
-		rectangle(board, src, 200, (255, 167, 167, 200))
-		for x,y in game.moves(selected):
-			y = 7-y
-			board.paste(
-					images.possible,
-					(xstep * x + xpad, ystep * y + ypad),
-					images.possible
-				)
-
-	if lastmove:
-		src = lastmove[:2]; dst = lastmove[2:]
-		if isinstance(src, str): src = game.fromalpha(src) 
-		if isinstance(dst, str): dst = game.fromalpha(dst) 
-		src = [src[0], 7-src[1]]
-		dst = [dst[0], 7-dst[1]]
-
-		arrow(board, src, dst, 30, 200)
 	for y,col in enumerate(game.board[::-1]):
 		for x,piece in enumerate(col):
 			if game.ischeck and tk[0] == x and tk[1] == y:
@@ -749,6 +758,26 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 				(xstep * n + xstep - 49, images.HEIGHT - 70),
 				c
 			)
+	if selected:
+		if isinstance(selected, str): src = game.fromalpha(selected) 
+		src = [src[0], 7-src[1]]
+		rectangle(board, src, 200, (255, 167, 167, 200))
+		for x,y in game.moves(selected):
+			y = 7-y
+			board.paste(
+					images.possible,
+					(xstep * x + xpad, ystep * y + ypad),
+					images.possible
+				)
+
+	if lastmove:
+		src = lastmove[:2]; dst = lastmove[2:]
+		if isinstance(src, str): src = game.fromalpha(src) 
+		if isinstance(dst, str): dst = game.fromalpha(dst) 
+		src = [src[0], 7-src[1]]
+		dst = [dst[0], 7-dst[1]]
+
+		arrow(board, src, dst, 30, 200)
 	if fp:
 		board.save(fp, 'PNG')
 	return board
@@ -761,23 +790,22 @@ class _userselect(discord.ui.UserSelect):
 	
 	async def callback(self, interaction: discord.Interaction):
 		if interaction.user == self.chess_user:
-			self.future.set_result(self.values[0])
+			self.future.set_result((self.values[0], interaction.response))
 
 class _promoteselect(discord.ui.Select):
-	def __init__(self):
+	def __init__(self, user):
+		self.chess_user = user
+		self.future = asyncio.Future()
 		options = [
-				discord.SelectOption(label='bishop', description='bishop', value=1),
-				discord.SelectOption(label='knight', description='knight', value=2),
-				discord.SelectOption(label='rook',   description='rook',   value=3),
-				discord.SelectOption(label='queen',  description='queen',  value=4),
+				discord.SelectOption(label='bishop', description='bishop', value=Pieces.BISHOP.value),
+				discord.SelectOption(label='knight', description='knight', value=Pieces.KNIGHT.value),
+				discord.SelectOption(label='rook',   description='rook',   value=Pieces.ROOK.value),
+				discord.SelectOption(label='queen',  description='queen',  value=Pieces.QUEEN.value),
 			]
 		super().__init__(placeholder='Choose what to promote to', min_values=1, max_values=1, options=options)
-
-class _promote(discord.ui.Modal):
-	promote = _promoteselect()
-
-	async def on_submit(self, interaction: discord.Interaction):
-		await interaction.response.send_message(f"{promote}", ephemeral=True)
+	async def callback(self, interaction: discord.Interaction):
+		if interaction.user == self.chess_user:
+			self.future.set_result((self.values[0], interaction.response))
 
 class Chess(commands.Cog, name='chess'):
 	def __init__(self, bot):
@@ -810,15 +838,15 @@ class Chess(commands.Cog, name='chess'):
 	@chess.command()
 	async def match(self, ctx, fen: Optional[str]=None):
 		print("new game", fen if fen else '')
-		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=False)
+		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=True)
 		view = discord.ui.View()	
 		select = _userselect(ctx.author)
 		view.add_item(select)
 		await th.add_user(ctx.author)
 		await th.send(f"**Select your opponent**", view=view)
-		opponent = await select.future
+		opponent, response = await select.future
 		await th.add_user(opponent)
-		await th.purge()
+#		await th.purge()
 
 		if fen is None:
 			fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -826,36 +854,47 @@ class Chess(commands.Cog, name='chess'):
 		buff = BytesIO()
 		img = generate_img(images=Images, game=game, fp=buff)
 		buff.seek(0)
-		await th.send(file=discord.File(buff, filename='board.png', description=game.tofen()))
+		await response.send_message(file=discord.File(buff, filename='board.png', description=game.tofen()))
 
 		self.games[th.id] = {'th': th, 'game': game}
 	
-	@chess.command()
-	async def promote(self, ctx):
-		view = discord.ui.View()
-		view.add_item(_promote)	
-		await ctx.send(view=view)
-
 	@commands.Cog.listener()
 	async def on_message(self, message):
 		obj = self.games.get(message.channel.id, None)
 		if not obj: return
+		game = obj.get('game')
 
 		if len(message.content) == 2:
 			try:
-				moves = obj['game'].moves(message.content)
+				moves = game.moves(message.content)
 			except AssertionError as e:
 				return await message.reply(e)
 			if not moves:
 				return await message.reply(f"No possible moves for {message.content}")
-			game = obj['game']
 			buff = BytesIO()
 			img = generate_img(images=Images, game=game, fp=buff, selected=message.content)
 			buff.seek(0)
+			await message.delete()
 			return await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 		if len(message.content) == 4:
 			try:
-				game = obj['game'].move(message.content[:2], message.content[2:])
+				src, dst = message.content[:2], message.content[2:]
+				if isinstance(src, str): src = Engine.fromalpha(src) 
+				if isinstance(dst, str): dst = Engine.fromalpha(dst) 
+			except AssertionError as e:
+				return
+			piece = None
+			if game.board[src[::-1]] % (1 << 3) == Pieces.PAWN.value:
+				if (game.turn == 'w' and dst[1] == 7) or (game.turn == 'b' and dst[1] == 0):
+					view = discord.ui.View()
+					select = _promoteselect(message.author)
+					view.add_item(select)
+					await obj['th'].send('**Select what to promote to**', view=view)
+					piece, response = await select.future
+					piece = Pieces(int(piece))
+					await response.send_message(f"OK", ephemeral=True)
+			try:
+				game = game.move(src, dst, promote=piece)
 			except AssertionError as e:
 				return await message.reply(e)
 			obj['game'] = game
@@ -865,7 +904,7 @@ class Chess(commands.Cog, name='chess'):
 			buff.seek(0)
 			return await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 		if message.content == "FEN":
-			return await message.reply(obj['game'].tofen())
+			return await message.reply(game.tofen())
 
 
 
