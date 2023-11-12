@@ -724,6 +724,12 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 	tk = game.turn_king
 	tk = [tk[0], 7 - tk[1]]
 
+	if selected:
+		if isinstance(selected, str): src = game.fromalpha(selected) 
+		src = [src[0], 7-src[1]]
+		rectangle(board, src, 200, (255, 167, 167, 200))
+
+
 	for y,col in enumerate(game.board[::-1]):
 		for x,piece in enumerate(col):
 			if game.ischeck and tk[0] == x and tk[1] == y:
@@ -758,10 +764,10 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 				(xstep * n + xstep - 49, images.HEIGHT - 70),
 				c
 			)
+
 	if selected:
 		if isinstance(selected, str): src = game.fromalpha(selected) 
 		src = [src[0], 7-src[1]]
-		rectangle(board, src, 200, (255, 167, 167, 200))
 		for x,y in game.moves(selected):
 			y = 7-y
 			board.paste(
