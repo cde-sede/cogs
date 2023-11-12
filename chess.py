@@ -19,6 +19,8 @@ from io import BytesIO
 import settings
 from pathlib import Path
 
+import logging
+_log = logging.getLogger(__name__)
 
 
 class Pieces(Enum):
@@ -252,6 +254,7 @@ class Engine:
 	def qcastle(self) -> bool: return self.castling & 0b0001
 
 
+	@cached_property
 	def tofen(self) -> str:
 		w = ''
 		for y in self.board[::-1]:
@@ -843,8 +846,10 @@ class Chess(commands.Cog, name='chess'):
 
 	@chess.command()
 	async def match(self, ctx, fen: Optional[str]=None):
-		print("new game", fen if fen else '')
-		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=True)
+		if fen is None:
+			fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+		_log.info("New chess game FEN=%s", fen)
+		th = await ctx.channel.create_thread(name=fen, invitable=True)
 		view = discord.ui.View()	
 		select = _userselect(ctx.author)
 		view.add_item(select)
@@ -854,8 +859,6 @@ class Chess(commands.Cog, name='chess'):
 		await th.add_user(opponent)
 #		await th.purge()
 
-		if fen is None:
-			fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 		game = Engine.fromfen(fen)
 		buff = BytesIO()
 		img = generate_img(images=Images, game=game, fp=buff)
@@ -872,7 +875,11 @@ class Chess(commands.Cog, name='chess'):
 
 		if len(message.content) == 2:
 			try:
-				moves = game.moves(message.content)
+				src = game.fromalpha(message.content) 
+			except AssertionError as e:
+				return
+			try:
+				moves = game.moves(src)
 			except AssertionError as e:
 				return await message.reply(e)
 			if not moves:
@@ -911,6 +918,7 @@ class Chess(commands.Cog, name='chess'):
 			return await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 		if message.content == "FEN":
 			return await message.reply(game.tofen())
+		await obj['th'].edit(name=game.tofen())
 
 
 
