@@ -563,7 +563,7 @@ def knight_arrow(img, start, end, thickness):
 		start[1] = end[1]
 
 	dir_ = end.astype(int) - start.astype(int)
-	triangle_len = triangle(img, end, dir_, thickness, angle=90)
+	triangle_len = triangle(img, end, dir_, thickness, angle=settings.chess.angle, unit=settings.chess.unit)
 
 	end = (end - triangle_len * (dir_ / np.sqrt(np.sum(np.power(dir_,2))))).astype('u8')
 	cv2.line(img, start, end, *cv2args)
@@ -635,7 +635,7 @@ def arrow(img, start, end, thickness, cell_size):
 		knight_arrow(mask, start, end, thickness)
 	else:
 		dir_ = end.astype(int) - start.astype(int)
-		triangle_len = triangle(mask, end, dir_, thickness, angle=90)
+		triangle_len = triangle(mask, end, dir_, thickness, angle=settings.chess.angle, unit=settings.chess.unit)
 
 		end = (end - triangle_len * (dir_ / np.sqrt(np.sum(np.power(dir_,2))))).astype('u8')
 
@@ -783,7 +783,7 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 		src = [src[0], 7-src[1]]
 		dst = [dst[0], 7-dst[1]]
 
-		arrow(board, src, dst, 30, 200)
+		arrow(board, src, dst, settings.chess.thickness, 200)
 	if fp:
 		board.save(fp, 'PNG')
 	return board
