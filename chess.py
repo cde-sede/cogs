@@ -253,7 +253,6 @@ class Engine:
 	@property
 	def qcastle(self) -> bool: return self.castling & 0b0001
 
-
 	def tofen(self) -> str:
 		w = ''
 		for y in self.board[::-1]:
