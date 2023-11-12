@@ -847,7 +847,8 @@ class Chess(commands.Cog, name='chess'):
 		if fen is None:
 			fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 		_log.info("New chess game FEN=%s", fen)
-		th = await ctx.channel.create_thread(name=fen, invitable=True)
+
+		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=True)
 		view = discord.ui.View()	
 		select = _userselect(ctx.author)
 		view.add_item(select)
@@ -916,8 +917,6 @@ class Chess(commands.Cog, name='chess'):
 			return await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
 		if message.content == "FEN":
 			return await message.reply(game.tofen())
-		await obj['th'].edit(name=game.tofen())
-
 
 
 async def setup(bot):
