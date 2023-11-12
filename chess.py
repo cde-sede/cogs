@@ -254,7 +254,6 @@ class Engine:
 	def qcastle(self) -> bool: return self.castling & 0b0001
 
 
-	@cached_property
 	def tofen(self) -> str:
 		w = ''
 		for y in self.board[::-1]:
