@@ -58,6 +58,5 @@ class Channels(commands.Cog, name='channels'):
 
 
 
-async def setup(bot):
+def setup(bot):
 	await bot.add_cog(Channels(bot))
-	
