@@ -59,4 +59,4 @@ class Channels(commands.Cog, name='channels'):
 
 
 def setup(bot):
-	await bot.add_cog(Channels(bot))
+	bot.add_cog(Channels(bot))
