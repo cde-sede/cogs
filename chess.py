@@ -789,13 +789,13 @@ def generate_img(*, images: Images, game: Engine=None, fen: str=None, fp: Binary
 		board.save(fp, 'PNG')
 	return board
 
-class _userselect(discord.ui.UserSelect):
+class OpponentSelect(discord.ui.Select):
 	def __init__(self, user):
 		self.chess_user = user
 		self.future = asyncio.Future()
-		super().__init__(placeholder="Choose an opponent", min_values=1, max_values=1)
-	
-	async def callback(self, interaction: discord.Interaction):
+		super().__init__(placeholder="Choose an opponent", min_values=1, max_values=1, select_type=discord.ComponentType.user_select)
+
+	async def callback(self, interaction):
 		if interaction.user == self.chess_user:
 			self.future.set_result((self.values[0], interaction.response))
 
@@ -803,13 +803,15 @@ class _promoteselect(discord.ui.Select):
 	def __init__(self, user):
 		self.chess_user = user
 		self.future = asyncio.Future()
-		options = [
-				discord.SelectOption(label='bishop', description='bishop', value=Pieces.BISHOP.value),
-				discord.SelectOption(label='knight', description='knight', value=Pieces.KNIGHT.value),
-				discord.SelectOption(label='rook',   description='rook',   value=Pieces.ROOK.value),
-				discord.SelectOption(label='queen',  description='queen',  value=Pieces.QUEEN.value),
-			]
-		super().__init__(placeholder='Choose what to promote to', min_values=1, max_values=1, options=options)
+
+		options=[
+			discord.SelectOption(label='bishop', description='bishop', value=str(Pieces.BISHOP.value)),
+			discord.SelectOption(label='knight', description='knight', value=str(Pieces.KNIGHT.value)),
+			discord.SelectOption(label='rook',   description='rook',   value=str(Pieces.ROOK.value)),
+			discord.SelectOption(label='queen',  description='queen',  value=str(Pieces.QUEEN.value)),
+		]
+		super().__init__(placeholder="Choose what to promote to", min_values=1, max_values=1, options=options)
+
 	async def callback(self, interaction: discord.Interaction):
 		if interaction.user == self.chess_user:
 			self.future.set_result((self.values[0], interaction.response))
@@ -848,9 +850,9 @@ class Chess(commands.Cog, name='chess'):
 			fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 		_log.info("New chess game FEN=%s", fen)
 
-		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game", invitable=True)
+		th = await ctx.channel.create_thread(name=f"{ctx.author.display_name}'s chess game")
 		view = discord.ui.View()	
-		select = _userselect(ctx.author)
+		select = OpponentSelect(ctx.author)
 		view.add_item(select)
 		await th.add_user(ctx.author)
 		await th.send(f"**Select your opponent**", view=view)
@@ -919,5 +921,5 @@ class Chess(commands.Cog, name='chess'):
 			return await message.reply(game.tofen())
 
 
-async def setup(bot):
-	await bot.add_cog(Chess(bot))
+def setup(bot):
+	bot.add_cog(Chess(bot))
