@@ -10,7 +10,7 @@ from queue import Queue, Empty
 from yt_dlp import YoutubeDL
 
 import logging
-#_log = logging.getLogger(__name__) 
+_log = logging.getLogger(__name__) 
 
 
 class _md:
@@ -44,11 +44,11 @@ class _download(_md):
 	def done(self, v):
 		self.song.done.set_result(v)
 		self.future.set_result(v)
-		#_log.info('DONE %s', self.song.url)
+		_log.info('DONE %s', self.song.url)
 		return v
 
 	async def download(self):
-		#_log.info('Downloading %s', self.song.url)
+		_log.info('Downloading %s', self.song.url)
 		if (self.song.path.exists()):
 			return self.done(True)
 		with YoutubeDL(settings.music.YDL_OPT) as ydl:
@@ -86,7 +86,7 @@ class Music(commands.Cog, name='music'):
 	async def search(self, item: Song):
 		# TODO handle other sources, probably defer the searching to a
 		#	commandless cog
-		#_log.info('Searching %s', item.query)
+		_log.info('Searching %s', item.query)
 		with YoutubeDL(settings.music.YDL_OPT) as ydl:
 			info = ydl.extract_info(item.query, download=False)
 
@@ -100,13 +100,12 @@ class Music(commands.Cog, name='music'):
 		loop = asyncio.get_event_loop()
 		def _recur(error):
 			if error:
-				#_log.warning("Error while stream recursion")
+				_log.warning("Error while stream recursion. Should never happen")
 				raise error
 			loop.create_task(self.stream())
 
 		try:
 			if self.voice is not None and self.voice.is_playing():
-				#_log.info("Already playing")
 				return
 			_log.info("%s", str(self.queue.queue))
 			song = self.queue.get(timeout=settings.music.disconnect_time)
