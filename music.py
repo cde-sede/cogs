@@ -110,7 +110,7 @@ class Music(commands.Cog, name='music'):
 				if error:
 					_log.warning("Error while stream recursion. Should never happen")
 					raise error
-				if song.looped:
+				if song.looped and self.voice is not None:
 					self.queue.put(song)
 				loop.create_task(self.stream())
 
