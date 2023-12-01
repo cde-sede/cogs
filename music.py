@@ -108,9 +108,12 @@ class Music(commands.Cog, name='music'):
 			if self.voice is not None and self.voice.is_playing():
 				#_log.info("Already playing")
 				return
+			_log.info("%s", str(self.queue.queue))
 			song = self.queue.get(timeout=settings.music.disconnect_time)
 			if song.looped:
+				_log.info("%s", str(self.queue.queue))
 				self.queue.put(song)
+				_log.info("%s", str(self.queue.queue))
 			song.download()
 			await song.done
 
