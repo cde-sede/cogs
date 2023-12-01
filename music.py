@@ -98,21 +98,22 @@ class Music(commands.Cog, name='music'):
 
 	async def stream(self):
 		loop = asyncio.get_event_loop()
-		def _recur(error):
-			if error:
-				_log.warning("Error while stream recursion. Should never happen")
-				raise error
-			loop.create_task(self.stream())
 
 		try:
 			if self.voice is not None and self.voice.is_playing():
 				return
 			_log.info("%s", str(self.queue.queue))
 			song = self.queue.get(timeout=settings.music.disconnect_time)
-			if song.looped:
-				_log.info("%s", str(self.queue.queue))
-				self.queue.put(song)
-				_log.info("%s", str(self.queue.queue))
+
+			def _recur(error):
+				# Called after the music played 
+				if error:
+					_log.warning("Error while stream recursion. Should never happen")
+					raise error
+				if song.looped:
+					self.queue.put(song)
+				loop.create_task(self.stream())
+
 			song.download()
 			await song.done
 
