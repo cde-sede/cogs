@@ -65,7 +65,7 @@ class Loader(commands.Cog, name='loader'):
 		def fetch_cog(self):
 			_log.info("Fetching cog %s (url %s)", self.name, self.url)
 			with open(self.realpath, 'wb') as f: 
-				r = requests.get(self.url)
+				r = requests.get(self.url, headers={'Cache-Control': 'no-cache'})
 				if r.status_code != 200:
 					_log.error("Error while fetching %s", self.name)
 					raise Loader.LoaderException()
