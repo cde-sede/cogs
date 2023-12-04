@@ -368,7 +368,6 @@ class Engine:
 					new.board[dst[::-1]] = promote.value + (1 << 3) 
 				if self.turn == 'b' and self.board[src[::-1]] == Pieces.PAWN.value            and dst[1] == 0:
 					new.board[dst[::-1]] = promote.value + (1 << 3) 
-			# TODO en passant final 
 			if self.en_passant != '-':
 				en_passant = self.fromalpha(self.en_passant)
 				if src[1] == en_passant[1] and np.abs(en_passant[0] - src[0]) == 1:
@@ -866,13 +865,23 @@ class Chess(commands.Cog, name='chess'):
 		buff.seek(0)
 		await response.send_message(file=discord.File(buff, filename='board.png', description=game.tofen()))
 
-		self.games[th.id] = {'th': th, 'game': game}
+		self.games[th.id] = {
+				'th': th,
+				'game': game,
+				'images': [img],
+				'turns': {
+					'w': ctx.message.author.id,
+					'b': opponent.id,
+			   }
+		   }
 	
 	@commands.Cog.listener()
 	async def on_message(self, message):
 		obj = self.games.get(message.channel.id, None)
 		if not obj: return
 		game = obj.get('game')
+		if obj['turns'][game.turn] != message.author.id:
+			return
 
 		if len(message.content) == 2:
 			try:
@@ -915,8 +924,27 @@ class Chess(commands.Cog, name='chess'):
 
 			buff = BytesIO()
 			img = generate_img(images=Images, game=game, fp=buff, lastmove=message.content)
+			obj['images'].append(img)
 			buff.seek(0)
-			return await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
+			await obj['th'].send(file=discord.File(buff, filename='board.png', description=game.tofen()))
+			if game.ischeckmate:
+				await obj['th'].send("Checkmate")
+				images = obj['images']
+
+				fp = BinaryIO()
+				gif = images[0].save(fp,
+						 save_all=True,
+						 append_images=images[1:],
+						 optimize=False,
+						 duration=100,
+						 loop=0)
+				fp.seek(0)
+				await obj['th'].send(file=discord.File(fp, filename='board.png', description=game.tofen()))
+
+				await obj['th'].archive(locked=True)
+				self.games.pop(message.channel.id)
+			return
+			
 		if message.content == "FEN":
 			return await message.reply(game.tofen())
 
