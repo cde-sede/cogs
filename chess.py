@@ -333,7 +333,7 @@ class Engine:
 	@cached_property
 	def ischeckmate(self) -> bool:
 		king = self.turn_king
-		if self.ischeck and len([*king_(self, self.board, king)]) == 0:
+		if self.ischeck and len([*king_(self, king)]) == 0:
 			return True
 		return False
 
