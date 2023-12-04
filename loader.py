@@ -6,6 +6,7 @@ import settings
 
 import logging
 import json
+import itertools
 
 _log = logging.getLogger(__name__)
 
@@ -98,8 +99,8 @@ class Loader(commands.Cog, name='loader'):
 		_log.info("Loading %s", cog)
 		cog.get()
 		if cog.src & self._cog.REMOTE:
-			self.bot.extcogs[cog.name] = cog
 			cog.used = True
+		self.bot.extcogs[cog.name] = cog
 		self.bot.load_extension(cog.path)
 
 	@commands.group()
@@ -116,8 +117,8 @@ class Loader(commands.Cog, name='loader'):
 			await ctx.send('Please fetch before loading')
 		else:
 			path = cog.get()
-			if self.bot.extcogs.get(cog.name, None) is not None:
-				self.bot.extcogs.get(cog.name).used = True
+			self.bot.extcogs[cog.name] = cog
+			cog.used = True
 			self.bot.load_extension(path)
 			await ctx.send(f"Loaded {cog}!")
 
@@ -125,9 +126,9 @@ class Loader(commands.Cog, name='loader'):
 	async def unload(self, ctx, *, cog: ExtConverter):
 		path = cog.get()
 		self.bot.unload_extension(path)
-		if self.bot.extcogs.get(cog.name, None) is not None:
+		if seelf.bot.extcogs.get(cog.name).src == self._cog.REMOTE:
 			cog.realpath.unlink(missing_ok=True)
-			self.bot.extcogs.pop(cog.name)
+		self.bot.extcogs.pop(cog.name)
 		await ctx.send(f"Unloaded {cog}")
 
 	@ext.command()
@@ -139,15 +140,17 @@ class Loader(commands.Cog, name='loader'):
 	@ext.command()
 	async def fetch(self, ctx, *, cog: ExtConverter):
 		if cog.src & self._cog.REMOTE:
+			_log.info(f"Fetching {cog}")
 			path = cog.get()
 			self.bot.extcogs[cog.name] = cog
 			await ctx.send(f"Fetched {cog}!")
 
 	@ext.command()
 	async def list(self, ctx):
-		await ctx.send(', '.join(self.bot.extensions.keys()) + f'\n{self.bot.extcogs}')
+		await ctx.send(f'{self.bot.extcogs}')
 
-	@ext.group()
+	@commands.group()
+	@commands.has_permissions(administrator=True)
 	async def autoload(self, ctx):
 		if ctx.invoked_subcommand:
 			return
@@ -156,6 +159,7 @@ class Loader(commands.Cog, name='loader'):
 
 	@autoload.command()
 	async def add(self, ctx, cog: str):
+		print(self.bot.extcogs)
 		if self.bot.extcogs.get(cog, None) is None:
 			return await ctx.send(f"`{cog}` is currently not a cog")
 		data = load_json(settings.loader.path)
@@ -164,7 +168,7 @@ class Loader(commands.Cog, name='loader'):
 		data.append(
 			{
 				"name": obj.name,
-				"src": '1' if obj.src == _cog.REMOTE else '0',
+				"src": '1' if obj.src == self._cog.REMOTE else '0',
 				"url": obj.url,
 			})
 
@@ -181,11 +185,13 @@ class Loader(commands.Cog, name='loader'):
 		data = load_json(settings.loader.path)
 		*cog_ ,= filter(lambda x: cog == x['name'], data)
 		if len(cog_) == 0:
-			return await ctx.send(f"`{cog}` is not amongst autoload")
+			return await ctx.send(f"`{cog}` is not in autoload")
 		if len(cog_) > 1:
-			return await ctx.send(f"`{cog}` has duplicates amongst autoload")
+			return await ctx.send(f"`{cog}` has duplicates in autoload")
 			
-		cog_[key] = value
+		if key == 'src':
+			value = int(value)
+		cog_[0][key] = value
 		save_json(settings.loader.path, data)
 		await ctx.send(f"Edited `{cog}`")
 
@@ -194,20 +200,19 @@ class Loader(commands.Cog, name='loader'):
 		data = load_json(settings.loader.path)
 		*matches ,= filter(lambda x: cog == x['name'], data)
 		if len(matches) == 0:
-			return await ctx.send(f"`{cog}` is not amongst autoload")
+			return await ctx.send(f"`{cog}` is not in autoload")
 
 
 		if force == False:
 			if len(matches) != 1:
-				return await ctx.send(f"`{cog}` has duplicates amongst autoload, use `force=True` to delete them all")
+				return await ctx.send(f"`{cog}` has duplicates in autoload, use `force=True` to delete them all")
 
 
 		*remainder ,= filter(lambda x: cog != x['name'], data)
 		save_json(settings.loader.path, remainder)
 		await ctx.send(f"Deleted {'' if len(matches) == 1 else 'all '}`{cog}`")
 
-
-	def autoload(self):
+	def _autoload(self):
 		# for backwards compatibility's sake, second step shouldn't be used anymore
 		# but data syntax for how modules should be loaded needs to stay consistent 
 		# across legacy and current code
@@ -217,8 +222,10 @@ class Loader(commands.Cog, name='loader'):
 				cog = self._cog(**ext)
 				self.load_util(cog)
 			except AssertionError as e:
+				_log.error("AssertionError Error while loading `%s`, halt", ext['name'])
 				raise # TODO proper error handling
 			except Loader.LoaderException as e:
+				_log.error("LoaderException Error while loading `%s`, skipped", ext['name'])
 				pass
 
 
