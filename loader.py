@@ -5,10 +5,20 @@ import re
 import settings
 
 import logging
+import json
 
 _log = logging.getLogger(__name__)
 
 urlcheck = re.compile(r'(?<=\/)(?:[\w\d]+(?!\/)(?=.py$))')
+
+def save_json(path, obj):
+	with open(path, 'w', encoding='utf8') as f:
+		json.dump(obj, f, indent=4)
+
+def load_json(path):
+	with open(path, 'r', encoding='utf8') as f:
+		data = json.load(f)
+	return data
 
 def cog_basepath(cog):
 	return cog.split('.')[-1]
@@ -38,6 +48,8 @@ class Loader(commands.Cog, name='loader'):
 
 		def __init__(self, *, name=None, src=LOCAL, url=None):
 			self.src = src
+			self.url = None
+			self.name = None
 			if src & self.REMOTE:
 				assert bool(url), 'invalid parameters' 
 				self.url = url
@@ -93,7 +105,10 @@ class Loader(commands.Cog, name='loader'):
 	@commands.group()
 	@commands.has_permissions(administrator=True)
 	async def ext(self, ctx):
-		pass
+		if ctx.invoked_subcommand:
+			return
+		else:
+			pass # TODO send help
 		
 	@ext.command()
 	async def load(self, ctx, *, cog: ExtConverter):
@@ -131,7 +146,81 @@ class Loader(commands.Cog, name='loader'):
 	@ext.command()
 	async def list(self, ctx):
 		await ctx.send(', '.join(self.bot.extensions.keys()) + f'\n{self.bot.extcogs}')
-	
+
+	@ext.group()
+	async def autoload(self, ctx):
+		if ctx.invoked_subcommand:
+			return
+		else:
+			pass # TODO send help
+
+	@autoload.command()
+	async def add(self, ctx, cog: str):
+		if self.bot.extcogs.get(cog, None) is None:
+			return await ctx.send(f"`{cog}` is currently not a cog")
+		data = load_json(settings.loader.path)
+		obj = self.bot.extcogs.get(cog, None) 
+
+		data.append(
+			{
+				"name": obj.name,
+				"src": '1' if obj.src == _cog.REMOTE else '0',
+				"url": obj.url,
+			})
+
+		save_json(settings.loader.path, data)
+		await ctx.send(f"Added `{cog}`")
+
+	@autoload.command()
+	async def edit(self, ctx, cog: str, key: str, value: str):
+		if self.bot.extcogs.get(cog, None) is None:
+			return await ctx.send(f"`{cog}` is currently not a cog")
+		if key != 'src' and key != 'url':
+			return await ctx.send(f"`{key}` is not a valid key. Use `src` or `url`")
+
+		data = load_json(settings.loader.path)
+		*cog_ ,= filter(lambda x: cog == x['name'], data)
+		if len(cog_) == 0:
+			return await ctx.send(f"`{cog}` is not amongst autoload")
+		if len(cog_) > 1:
+			return await ctx.send(f"`{cog}` has duplicates amongst autoload")
+			
+		cog_[key] = value
+		save_json(settings.loader.path, data)
+		await ctx.send(f"Edited `{cog}`")
+
+	@autoload.command()
+	async def delete(self, ctx, name: str, force: bool=False):
+		data = load_json(settings.loader.path)
+		*matches ,= filter(lambda x: cog == x['name'], data)
+		if len(matches) == 0:
+			return await ctx.send(f"`{cog}` is not amongst autoload")
+
+
+		if force == False:
+			if len(matches) != 1:
+				return await ctx.send(f"`{cog}` has duplicates amongst autoload, use `force=True` to delete them all")
+
+
+		*remainder ,= filter(lambda x: cog != x['name'], data)
+		save_json(settings.loader.path, remainder)
+		await ctx.send(f"Deleted {'' if len(matches) == 1 else 'all '}`{cog}`")
+
+
+	def autoload(self):
+		# for backwards compatibility's sake, second step shouldn't be used anymore
+		# but data syntax for how modules should be loaded needs to stay consistent 
+		# across legacy and current code
+		data = load_json(settings.loader.path)
+		for ext in itertools.chain(settings.second_step_ext, data):
+			try:
+				cog = self._cog(**ext)
+				self.load_util(cog)
+			except AssertionError as e:
+				raise # TODO proper error handling
+			except Loader.LoaderException as e:
+				pass
+
 
 def setup(bot):
 	bot.add_cog(Loader(bot))
