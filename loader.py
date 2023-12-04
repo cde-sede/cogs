@@ -167,7 +167,7 @@ class Loader(commands.Cog, name='loader'):
 		data.append(
 			{
 				"name": obj.name,
-				"src": '1' if obj.src == self._cog.REMOTE else '0',
+				"src": 1 if obj.src == self._cog.REMOTE else 0,
 				"url": obj.url,
 			})
 
@@ -205,7 +205,6 @@ class Loader(commands.Cog, name='loader'):
 		if force == False:
 			if len(matches) != 1:
 				return await ctx.send(f"`{cog}` has duplicates in autoload, use `force=True` to delete them all")
-
 
 		*remainder ,= filter(lambda x: cog != x['name'], data)
 		save_json(settings.loader.path, remainder)
