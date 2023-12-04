@@ -159,7 +159,6 @@ class Loader(commands.Cog, name='loader'):
 
 	@autoload.command()
 	async def add(self, ctx, cog: str):
-		print(self.bot.extcogs)
 		if self.bot.extcogs.get(cog, None) is None:
 			return await ctx.send(f"`{cog}` is currently not a cog")
 		data = load_json(settings.loader.path)
