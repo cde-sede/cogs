@@ -190,6 +190,7 @@ def king_(self, pos):
 	turn = (lambda x,y: self.board[y,x] > 8)
 	for dx in [-1, 0, 1]:
 		for dy in [-1, 0, 1]:
+			if dx == dy == 0: continue
 			x, y = pos[0] + dx, pos[1] + dy
 			if not (0 <= x < 8): continue
 			if not (0 <= y < 8): continue
@@ -197,7 +198,8 @@ def king_(self, pos):
 			if (self.board[y, x]) != 0:
 				if turn(*pos) == turn(x, y): continue
 				yield (x, y)
-			yield (x, y)
+			else:
+				yield (x, y)
 	if self.turn == 'w':
 		if self.Kcastle:
 			for p in ((5, 0), (6, 0)):
@@ -273,10 +275,10 @@ class Engine:
 			w += '/'
 		w += f' {self.turn} '
 
-		w += ('K' if self.castling & 0b1000 else '') +\
-		     ('Q' if self.castling & 0b0100 else '') +\
-		     ('k' if self.castling & 0b0010 else '') +\
-		     ('q' if self.castling & 0b0001 else '')
+		w += ('k' if self.castling & 0b1000 else '') +\
+		     ('q' if self.castling & 0b0100 else '') +\
+		     ('K' if self.castling & 0b0010 else '') +\
+		     ('Q' if self.castling & 0b0001 else '')
 
 		w += f' {self.en_passant} {self.half} {self.full}'
 		return w
@@ -323,6 +325,8 @@ class Engine:
 		dir_ = -1;
 		if turn(*king): dir_ = 1;
 		for x,y in [(king[0]-1, king[1]+dir_), (king[0]+1,king[1]+dir_)]:
+			if not (0 <= x < 8 and 0 <= y < 8):
+				continue
 			if self.board[y, x] != 0 and turn(x, y) != turn(*king):
 				p = self.board[y, x]
 				if p > 8: p -= 1 << 3;
@@ -333,7 +337,10 @@ class Engine:
 	@cached_property
 	def ischeckmate(self) -> bool:
 		king = self.turn_king
-		if self.ischeck and len([*king_(self, king)]) == 0:
+		if self.ischeck:
+			for x,y in king_(self, king):
+				if not self._protomove(king, (x,y)).ischeck:
+					return False
 			return True
 		return False
 
@@ -930,16 +937,21 @@ class Chess(commands.Cog, name='chess'):
 			if game.ischeckmate:
 				await obj['th'].send("Checkmate")
 				images = obj['images']
+				for _ in range(4):
+					images.append(img)
+				print(images)
 
 				fp = BinaryIO()
-				gif = images[0].save(fp,
+				gif = images[0].save(settings.chess.img / "temp.gif",
+						 format="GIF",
 						 save_all=True,
 						 append_images=images[1:],
 						 optimize=False,
-						 duration=100,
+						 duration=settings.chess.gif_frame_delay,
 						 loop=0)
 				fp.seek(0)
-				await obj['th'].send(file=discord.File(fp, filename='board.png', description=game.tofen()))
+				await obj['th'].send(file=discord.File(settings.chess.img / "temp.gif", filename='game.gif', description=game.tofen()))
+				(settings.chess.img / "temp.gif").unlink()
 
 				await obj['th'].archive(locked=True)
 				self.games.pop(message.channel.id)
